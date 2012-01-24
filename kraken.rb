@@ -30,7 +30,7 @@ module Kraken
         end
 
         def get(url)
-        return open(url) { |f| f.read }
+            return open(url) { |f| f.read }
         end
 
       def clearLinks
@@ -46,7 +46,6 @@ module Kraken
         Signal.trap("HUP") { puts "PageProcessor #{pid} exiting..."; exit; }
         loop do
           while (res = @links.find_and_modify( { :query=>{:processing=>false, :done=>false}, :update=>{"$set"=>{:processing=>true, :pid=>pid}}, :new=>true  } )) do
-            ## download page
             src = get(res["url"]) 
             @pages.insert({ :body=>src, :url=>res["url"], :pid=>res["pid"]}) if @opts[:keep_page_body]
 
@@ -123,6 +122,7 @@ module Kraken
             @opts = opts
 
             @page_proc = PageProcessor.new(@opts)
+            @blocks = {}
 
             yield self if block_given?
         end
@@ -136,6 +136,10 @@ module Kraken
                 yield engine if block_given?
                 engine.run
             end
+        end
+
+        def on_page(&block)
+            @blocks[:on_page] << block
         end
 
         #
