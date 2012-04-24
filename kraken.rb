@@ -11,7 +11,7 @@ module Kraken
 
 
     def Kraken.crawl(opts = {}, &block)
-      return PageProcessor.start(opts)
+      PageProcessor.start(opts, &block)
     end
 
 ########## PAGE PROCESSOR ################
@@ -22,7 +22,9 @@ module Kraken
           @links=[]
           @pages=[]
           @procs=[]
-          @blocks = []
+          @blocks={}
+          @blocks[:on_every_page] = []
+          @skip_link_patterns = []
           yield self if block_given?
         end
 
@@ -36,7 +38,33 @@ module Kraken
             processor.goTest
           end
         end
+
+        #
+        # Add one ore more Regex patterns for URLs which should not be
+        # followed
+        #
+        def skip_links_like(*patterns)
+          @skip_link_patterns.concat [patterns].flatten.compact
+          self
+        end
         
+        #
+        # Add a block to be executed on every Page as they are encountered
+        # during the crawl
+        #
+        def on_every_page(&block)
+          @blocks[:on_every_page] << block
+          self
+        end
+    
+        #
+        # Returns +true+ if *link* should not be visited because
+        # its URL matches a skip_link pattern.
+        #
+        def skip_link?(link)
+          @skip_link_patterns.any? { |pattern| link.path =~ pattern }
+        end
+    
       def clearLinks
       end
 
@@ -56,16 +84,16 @@ module Kraken
           @queue = @channel.queue("kraken.links", :durable => true, :auto_delete => true)
           
           100.times { 
-            puts "[#{pid}]Posting 100 links..."
+            #puts "[#{pid}]Posting 100 links..."
             @exchange.publish "http://www.ruby-doc.org/core-1.9.3/Process.html", :routing_key => "kraken.links", :type => "new_link"
           }# if opts[:dbg_pre_populate_pages]
           @queue.subscribe(:ack => true) do |metadata, payload|
             case metadata.type
             when "new_link"
               #data = YAML.load(payload)
-              puts "[Worker #{pid}] Received a new_link request with #{payload}"
+              #puts "[Worker #{pid}] Received a new_link request with #{payload}"
               src = get(payload) 
-              #@blocks[:on_page].each { |blk| blk.call(src) }
+              @blocks[:on_every_page].each { |blk| blk.call(src) }
               metadata.ack
             else
               puts "[commands] Unknown command: #{metadata.type}"

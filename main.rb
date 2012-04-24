@@ -4,5 +4,8 @@
 require "rubygems"
 require 'kraken.rb'
 
-Kraken.crawl({}) do |kraken|
+Kraken.crawl({}) do |K|
+  K.on_every_page do |page|
+    puts page[0..80]
+  end
 end
