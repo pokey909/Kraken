@@ -6,6 +6,6 @@ require 'kraken.rb'
 
 Kraken.crawl({}) do |K|
   K.on_every_page do |page|
-    puts page[0..80]
+    puts page.body[0..540] if page.html?
   end
 end
